@@ -41,13 +41,12 @@ module Yotpo
     include Yotpo::Answer
     include Yotpo::Purchase
 
-
     #
     # Creates a new instance of Yotpo::Client
     #
     # @param url [String] The url to yotpo api (https://api.yotpo.com)
     # @param parallel_requests [Integer String] The maximum parallel request to do (5)
-    def initialize(url = 'https://api.yotpo.com', parallel_requests, timeout, user_agent)
+    def initialize(url = 'https://api.yotpo.com', parallel_requests = 5, timeout = 5, user_agent = {})
       @url = url
       @parallel_requests = parallel_requests
       @timeout = timeout
@@ -61,7 +60,7 @@ module Yotpo
     # @param url [String] the relative path in the Yotpo API
     # @param params [Hash] the url params that should be passed in the request
     def get(url, params = {})
-      params = params.inject({}){|memo,(k,v)| memo[k.to_s] = v; memo}
+      params = params.inject({}) { |memo,(k,v)| memo[k.to_s] = v; memo }
       preform(url, :get, params: params) do
         return connection.get(url, params)
       end
@@ -147,8 +146,10 @@ module Yotpo
         conn.response :mashify
 
         # Setting request and response to use JSON/XML
-        conn.request :oj
-        conn.response :oj, :content_type => /\bjson$/
+        conn.request :json
+        conn.response :json,
+                      content_type: /\bjson$/,
+                      parser_options: { symbolize_names: true }
 
         # Set to use instrumentals to get time logs
         conn.use :instrumentation
@@ -156,16 +157,18 @@ module Yotpo
         conn.adapter :typhoeus
       end
     end
+
     private
-    def convert_hash_keys(value)
-      case value
-        when Array
-          value.map { |v| convert_hash_keys(v) }
-        when Hash
-          Hash[value.map { |k, v| [k.to_s, convert_hash_keys(v)] }]
-        else
-          value
+
+      def convert_hash_keys(value)
+        case value
+          when Array
+            value.map { |v| convert_hash_keys(v) }
+          when Hash
+            Hash[value.map { |k, v| [k.to_s, convert_hash_keys(v)] }]
+          else
+            value
+        end
       end
-    end
   end
 end
